@@ -34,6 +34,21 @@ export function createApp() {
     });
   });
 
+  /**
+   * The public address of this deployment, when it is exposed through a
+   * Cloudflare tunnel. The tunnel supervisor writes the file.
+   */
+  app.get('/api/tunnel', (_req, res) => {
+    const file = path.join(config.dataDir, 'tunnel-url.txt');
+    let url = null;
+    try {
+      url = fs.readFileSync(file, 'utf8').trim() || null;
+    } catch {
+      url = null;
+    }
+    res.json({ publicUrl: url, localUrl: `http://localhost:${config.port}` });
+  });
+
   app.get('/api/stats', async (_req, res, next) => {
     try {
       const projects = await db().get('SELECT COUNT(*) AS c FROM projects');

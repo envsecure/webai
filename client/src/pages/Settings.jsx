@@ -31,6 +31,7 @@ export default function Settings() {
   const [notice, setNotice] = useState('');
   const [testResult, setTestResult] = useState(null);
   const [testing, setTesting] = useState(false);
+  const [publicUrl, setPublicUrl] = useState(null);
 
   useEffect(() => {
     api
@@ -42,6 +43,7 @@ export default function Settings() {
       })
       .catch(() => {});
     api.apiKeys().then((res) => setKeys(res.apiKeys)).catch(() => {});
+    api.tunnelUrl().then((res) => setPublicUrl(res.publicUrl)).catch(() => {});
   }, []);
 
   function flash(text) {
@@ -149,6 +151,51 @@ export default function Settings() {
         </div>
 
         <div className="grid grid--2">
+          {/* ------------------------------------------------- public address */}
+          <section className="card" style={{ gridColumn: '1 / -1' }}>
+            <div className="row" style={{ justifyContent: 'space-between' }}>
+              <h2 className="card__title">Public address</h2>
+              {publicUrl ? (
+                <span className="badge badge--success">tunnel running</span>
+              ) : (
+                <span className="badge">not exposed</span>
+              )}
+            </div>
+            <p className="card__body">
+              {publicUrl
+                ? 'Anyone with this address can open the app and create an account.'
+                : 'This deployment is only reachable locally. Run the tunnel supervisor to expose it.'}
+            </p>
+            <div className="row row--wrap" style={{ marginTop: 14 }}>
+              <code
+                className="mono"
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: 'var(--radius)',
+                  background: 'var(--muted)',
+                  border: '1px solid var(--border)',
+                  wordBreak: 'break-all',
+                }}
+              >
+                {publicUrl || `http://localhost:${window.location.port || 3001}`}
+              </code>
+              <button
+                className="btn btn--ghost btn--sm"
+                onClick={() => {
+                  navigator.clipboard?.writeText(publicUrl || window.location.origin);
+                  flash('Copied');
+                }}
+              >
+                Copy
+              </button>
+              {publicUrl && (
+                <a className="btn btn--quiet btn--sm" href={publicUrl} target="_blank" rel="noreferrer">
+                  Open
+                </a>
+              )}
+            </div>
+          </section>
+
           {/* ------------------------------------------------- AI model */}
           <ModelSetup settings={settings} llm={llm} providers={providers} onSaved={(res) => {
             setSettings(res.settings);

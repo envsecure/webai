@@ -116,6 +116,7 @@ export const api = {
 
   stats: () => request('/stats', { auth: false }),
   llmStatus: () => request('/llm/status', { auth: false }),
+  tunnelUrl: () => request('/tunnel', { auth: false }),
   detectModel: (payload) => request('/settings/detect-model', { method: 'POST', body: payload }),
   listModels: (payload) => request('/settings/list-models', { method: 'POST', body: payload }),
 };
