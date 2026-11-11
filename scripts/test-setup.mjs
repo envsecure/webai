@@ -8,8 +8,10 @@
  *   node scripts/fake-openai.mjs 3998 &
  *   node scripts/test-setup.mjs http://127.0.0.1:3998/v1 http://127.0.0.1:3001
  */
-const PROVIDER_BASE = (process.argv[2] || 'http://127.0.0.1:3998/v1').replace(/\/$/, '');
-const BASE = (process.argv[3] || 'http://127.0.0.1:3001').replace(/\/$/, '');
+// One argument = the app under test. Two = provider endpoint, then app.
+const [arg1, arg2] = process.argv.slice(2);
+const PROVIDER_BASE = (arg2 ? arg1 : 'http://127.0.0.1:3998/v1').replace(/\/$/, '');
+const BASE = (arg2 ? arg2 : arg1 || 'http://127.0.0.1:3001').replace(/\/$/, '');
 
 let failures = 0;
 const ok = (m) => console.log(`  ✔ ${m}`);
