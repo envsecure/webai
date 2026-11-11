@@ -19,7 +19,8 @@
     "test:agent": "node scripts/test-agent.mjs",
     "test:provider": "node scripts/test-provider.mjs",
     "fake:llm": "node scripts/fake-openai.mjs",
-    "test:sandbox": "node scripts/test-sandbox.mjs"
+    "test:sandbox": "node scripts/test-sandbox.mjs",
+    "test:full-app": "node scripts/test-full-app.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

@@ -162,6 +162,12 @@ export async function runAgent({
 
     for (const call of calls) {
       const started = Date.now();
+      emit({
+        type: 'tool_progress',
+        tool: call.name,
+        path: call.args?.path ?? null,
+        message: progressMessage(call),
+      });
       emit({ type: 'tool_start', tool: call.name, args: previewArgs(call.args) });
 
       if (call.name === 'finalize') {
@@ -341,6 +347,29 @@ function parsePlan(text) {
       .slice(0, 8);
   } catch {
     return null;
+  }
+}
+
+/**
+ * A human readable description of what the agent is doing right now.
+ */
+export function progressMessage(call) {
+  const path = call.args?.path;
+  switch (call.name) {
+    case 'write_file':
+      return path ? `Writing ${path}` : 'Writing a file';
+    case 'read_file':
+      return path ? `Reading ${path}` : 'Reading a file';
+    case 'delete_file':
+      return path ? `Deleting ${path}` : 'Deleting a file';
+    case 'list_files':
+      return 'Listing the project files';
+    case 'delegate':
+      return `Delegating to ${call.args?.subagent || 'a subagent'}`;
+    case 'finalize':
+      return 'Finalising the build';
+    default:
+      return call.name;
   }
 }
 

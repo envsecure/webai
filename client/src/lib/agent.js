@@ -71,6 +71,8 @@ export function describeEvent(event) {
       return { kind: 'iteration', text: `Iteration ${event.iteration}/${event.max}` };
     case 'message':
       return { kind: 'message', text: event.text };
+    case 'tool_progress':
+      return { kind: 'tool', text: event.message || event.tool };
     case 'tool_start':
       return { kind: 'tool', text: `${event.tool}(${summarizeArgs(event.args)})` };
     case 'tool_call':
@@ -114,6 +116,7 @@ export function describeEvent(event) {
 function summarizeArgs(args) {
   if (!args || typeof args !== 'object') return '';
   const parts = Object.entries(args)
+    .filter(([key]) => key !== 'content')
     .map(([k, v]) => {
       if (typeof v === 'string') return `${k}=${v.length > 40 ? `${v.slice(0, 40)}…` : v}`;
       if (v && typeof v === 'object') return `${k}=${JSON.stringify(v).slice(0, 40)}`;

@@ -27,6 +27,13 @@ router.use(express.raw({ type: '*/*', limit: '4mb' }));
 
 router.all('/:projectId/*', async (req, res) => {
   const projectId = req.params.projectId;
+
+  // Without the trailing slash the relative API calls in the generated client
+  // would resolve one directory up, so send the browser to the canonical path.
+  if (req.originalUrl === `/api/sandbox/${projectId}`) {
+    return res.redirect(302, `/api/sandbox/${projectId}/`);
+  }
+
   const state = sandboxState(projectId);
   if (!state.port) {
     return res.status(503).json({

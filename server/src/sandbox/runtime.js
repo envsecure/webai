@@ -97,7 +97,11 @@ if (fs.existsSync(routesDir)) {
       const mod = await import(pathToFileURL(path.join(routesDir, file)).href);
       const router = mod.default || mod.router;
       if (router) {
+        // Mounted twice on purpose: once under the proxy prefix (what the
+        // generated client calls) and once at the root, so the app works
+        // whether it is opened through the proxy or on its own.
         app.use(`${BASE}api/${name}`, router);
+        app.use(`/api/${name}`, router);
         mounted.push(name);
       }
     } catch (err) {

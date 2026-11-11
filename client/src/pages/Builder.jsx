@@ -28,6 +28,7 @@ export default function Builder() {
   const [feed, setFeed] = useState([]);
   const [agentInfo, setAgentInfo] = useState(null);
   const [needsModel, setNeedsModel] = useState(false);
+  const [progress, setProgress] = useState({ phase: null, iteration: 0, max: 0 });
   const [showFeed, setShowFeed] = useState(true);
   const endRef = useRef(null);
 
@@ -72,16 +73,49 @@ export default function Builder() {
     try {
       await streamChat(projectId, text, {
         onEvent: (evt) => {
-          if (evt.type === 'agent_event') {
-            const described = describeEvent(evt.event);
-            if (described) {
-              setFeed((f) => [...f, { ...described, id: `${Date.now()}-${f.length}` }]);
-            }
-          } else if (evt.type === 'user_message') {
-            setFeed((f) => [...f, { kind: 'phase', text: 'Phase: build', id: `phase-${f.length}` }]);
-          } else if (evt.type === 'error') {
+          if (evt.type === 'error') {
             if (evt.code === 'no_model_configured') setNeedsModel(true);
             setError(evt.message || 'The build failed');
+            return;
+          }
+          if (evt.type === 'user_message') {
+            setProgress({ phase: 'build', iteration: 0, max: 0 });
+            setFeed((f) => [...f, { kind: 'phase', text: 'Phase: build', id: `phase-${f.length}` }]);
+            return;
+          }
+          if (evt.type !== 'agent_event') return;
+          const e = evt.event;
+
+          if (e.type === 'plan' && Array.isArray(e.plan)) {
+            setPlan(e.plan);
+            setFeed((f) => [
+              ...f,
+              {
+                kind: 'plan',
+                text: e.source === 'model' ? 'Plan from the model' : 'Plan (heuristic)',
+                id: `plan-${f.length}`,
+              },
+              ...e.plan.map((step, i) => ({
+                kind: 'plan-step',
+                text: `${i + 1}. ${step.step} — ${step.detail}`,
+                id: `plan-${f.length}-${i}`,
+              })),
+            ]);
+            return;
+          }
+
+          if (e.type === 'phase') {
+            setProgress((p) => ({ ...p, phase: e.phase }));
+          }
+          if (e.type === 'iteration') {
+            setProgress((p) => ({ ...p, iteration: e.iteration, max: e.max }));
+          }
+          // The progress event already says what the tool is doing.
+          if (e.type === 'tool_start' || e.type === 'tool_call') return;
+
+          const described = describeEvent(e);
+          if (described) {
+            setFeed((f) => [...f, { ...described, id: `${Date.now()}-${f.length}` }]);
           }
         },
       });
@@ -157,6 +191,17 @@ export default function Builder() {
             </div>
           </div>
           <span className="badge">{project.messagesCount} messages</span>
+          {busy && (
+            <span className="badge badge--accent">
+              {progress.phase === 'review'
+                ? 'Reviewing'
+                : progress.phase === 'plan'
+                  ? 'Planning'
+                  : progress.max
+                    ? `Iteration ${progress.iteration}/${progress.max}`
+                    : 'Working'}
+            </span>
+          )}
         </header>
 
         <div className="builder__messages">

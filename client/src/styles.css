@@ -1892,3 +1892,16 @@ svg {
   display: flex;
   background: var(--bg-elevated);
 }
+
+/* The plan steps in the agent feed. */
+.feed__row--plan {
+  background: transparent;
+  color: var(--fg);
+  font-weight: 600;
+  padding-left: 0;
+}
+
+.feed__row--plan-step {
+  background: color-mix(in srgb, var(--accent-primary) 7%, transparent);
+  color: var(--fg-muted);
+}
