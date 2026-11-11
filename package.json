@@ -1,0 +1,25 @@
+{
+  "name": "webai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "webai — a Lovable-style AI app builder: React + Express + SQLite",
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c cyan,magenta \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "npm --workspace server run dev",
+    "dev:client": "npm --workspace client run dev",
+    "build": "npm --workspace client run build",
+    "start": "npm --workspace server run start",
+    "seed": "npm --workspace server run seed",
+    "reset": "npm --workspace server run reset"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  },
+  "engines": {
+    "node": ">=18.17"
+  }
+}
