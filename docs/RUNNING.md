@@ -238,17 +238,53 @@ To publish it behind nginx, add a `webai` service to your compose file and proxy
 
 ## 5. Environment variables
 
-| Variable           | Default                     | Description                                    |
-| ------------------ | --------------------------- | ---------------------------------------------- |
-| `NODE_ENV`         | `development`               | Set to `production` in production              |
-| `PORT`             | `3001`                      | HTTP port                                      |
-| `HOST`             | `0.0.0.0`                   | Bind address (`127.0.0.1` behind nginx)        |
-| `DATA_DIR`         | `./data`                    | Directory for the database                     |
-| `SQLITE_FILE`      | `$DATA_DIR/app.db`          | Full path to the SQLite file                   |
-| `DB_DRIVER`        | `sqlite`                    | `sqlite` or `postgres`                        |
-| `DATABASE_URL`     | —                           | Postgres connection string                     |
-| `AUTH_SECRET`      | dev fallback                | HMAC secret — **always set this in production**|
-| `AUTH_TOKEN_TTL`   | `2592000`                   | Session lifetime in seconds (30 days)          |
+| Variable            | Default                     | Description                                    |
+| ------------------- | --------------------------- | ---------------------------------------------- |
+| `NODE_ENV`          | `development`               | Set to `production` in production              |
+| `PORT`              | `3001`                      | HTTP port                                      |
+| `HOST`              | `0.0.0.0`                   | Bind address (`127.0.0.1` behind nginx)        |
+| `DATA_DIR`          | `./data`                    | Directory for the database                     |
+| `SQLITE_FILE`       | `$DATA_DIR/app.db`          | Full path to the SQLite file                   |
+| `DB_DRIVER`         | `sqlite`                    | `sqlite` or `postgres`                        |
+| `DATABASE_URL`      | —                           | Postgres connection string                     |
+| `AUTH_SECRET`       | dev fallback                | HMAC secret — **always set this in production**|
+| `AUTH_TOKEN_TTL`    | `2592000`                   | Session lifetime in seconds (30 days)          |
+| `LLM_PROVIDER`      | auto                        | `openai`, `anthropic`, `openrouter`, `groq`, `together`, `ollama`, `compatible`, `mock` |
+| `LLM_API_KEY`       | —                           | Model API key (provider-specific vars also work) |
+| `LLM_BASE_URL`      | provider default            | Override the provider base URL                 |
+| `LLM_MODEL`         | provider default            | Model name                                     |
+| `LLM_MAX_ITERATIONS`| `12`                        | Agent loop budget                              |
+| `LLM_REVIEW_ROUNDS` | `1`                         | Self-review rounds                             |
+| `LLM_CONTEXT_TOKENS`| `24000`                     | Context window size                            |
+
+### Turning on a real model
+
+The build agent runs against the configured provider. Set the key in the
+environment (server-wide) or per user in **Settings → AI model** (encrypted
+with AES-256-GCM before storage):
+
+```bash
+# server-wide
+LLM_PROVIDER=openai OPENAI_API_KEY=sk-... npm start
+
+# or per user: Settings -> AI model -> provider, model, API key
+```
+
+With no provider configured the app uses the offline mock agent: the same loop,
+tools and subagents, but the model is local, so nothing leaves the machine.
+Check what is active:
+
+```bash
+curl -s https://your-domain.com/api/health
+# "authSecret":"custom", ... and Settings -> AI model shows the provider
+```
+
+Test a provider from the UI (**Test connection**) or directly:
+
+```bash
+curl -s -X POST https://your-domain.com/api/settings/test-llm \
+  -H "Authorization: Bearer $TOKEN"
+```
 
 ---
 

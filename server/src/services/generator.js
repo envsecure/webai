@@ -360,3 +360,205 @@ export default function App() {
 export async function generateWithModel(prompt) {
   return generateApp(prompt);
 }
+
+/* -------------------------------------------------------------------------- */
+/* Mock provider                                                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A scripted agent used when no model provider is configured.
+ *
+ * It speaks the same tool protocol as a real model, so the agent loop, the
+ * context window, the subagent delegation and the review round all run for
+ * real - only the "model" is local. The files it writes are the ones the
+ * deterministic generator produces, so the output is genuinely useful.
+ */
+export function createMockResponder() {
+  const counters = new Map();
+
+  const conversationKey = (messages) => {
+    const system = messages.find((m) => m.role === 'system')?.content || '';
+    const firstUser = messages.find((m) => m.role === 'user')?.content || '';
+    return `${system.slice(0, 60)}::${firstUser.slice(0, 60)}`;
+  };
+
+  const nextStep = (messages) => {
+    const key = conversationKey(messages);
+    const n = (counters.get(key) || 0) + 1;
+    counters.set(key, n);
+    return n;
+  };
+
+  const extractPrompt = (messages) => {
+    for (const m of messages) {
+      if (m.role !== 'user') continue;
+      const text = String(m.content || '');
+      const build = text.match(/Build request:\s*(.+)/s);
+      if (build) return build[1].split('\n')[0].trim();
+      const request = text.match(/^\s*Request:\s*(.+)/s);
+      if (request) return request[1].split('\n')[0].trim();
+      if (!text.startsWith('[') && !text.startsWith('Continue:')) {
+        return text.split('\n')[0].trim().slice(0, 200);
+      }
+    }
+    return 'a small web app';
+  };
+
+  /** Rough token usage so the UI shows something meaningful for the mock. */
+  const mockUsage = (messages) => {
+    const chars = messages.reduce(
+      (sum, m) => sum + String(m.content ?? '').length + JSON.stringify(m.toolCalls ?? '').length,
+      0
+    );
+    const total = Math.ceil(chars / 3.6) + 8 * messages.length;
+    return {
+      prompt_tokens: Math.ceil(total * 0.8),
+      completion_tokens: Math.ceil(total * 0.2),
+      total_tokens: total,
+    };
+  };
+
+  return async function mockResponder(messages, { tools = [] } = {}) {
+    const names = new Set(tools.map((t) => t.name));
+    const system = messages.find((m) => m.role === 'system')?.content || '';
+    const prompt = extractPrompt(messages);
+    const app = generateApp(prompt);
+    const files = app.files;
+    const step = nextStep(messages);
+
+    const respond = (content, toolCalls = []) => ({
+      content,
+      toolCalls,
+      usage: mockUsage(messages),
+    });
+
+    const call = (name, args) => ({
+      id: `call_${name}_${Math.random().toString(36).slice(2, 8)}`,
+      name,
+      args,
+    });
+
+    /* ------------------- planning / summarising (no tools) ---------------- */
+    if (!tools.length) {
+      if (/build plans/i.test(system)) {
+        const plan = buildPlan(detectAppType(prompt), prompt).map((p) => ({
+          step: p.step,
+          detail: p.detail,
+        }));
+        return respond(JSON.stringify(plan));
+      }
+      if (/summarise/i.test(system)) {
+        return respond(
+          `Worked on: ${prompt}. Wrote ${Object.keys(files).length} files ` +
+            `(${Object.keys(files).join(', ')}).`
+        );
+      }
+      return respond('ok');
+    }
+
+    const routePath = Object.keys(files).find((p) => p.startsWith('server/src/routes/'));
+    const componentPath = Object.keys(files).find((p) => p.startsWith('client/src/components/'));
+
+    /* ---------------------------- subagents ------------------------------- */
+    if (!names.has('delegate')) {
+      if (system.includes('design the data model')) {
+        if (step === 1) {
+          return respond('Writing the SQLite schema.', [
+            call('write_file', { path: 'server/schema.sql', content: files['server/schema.sql'] }),
+          ]);
+        }
+        return respond('Schema done.', [call('finalize', { summary: 'Designed the SQLite schema.' })]);
+      }
+
+      if (system.includes('build the backend')) {
+        if (step === 1) {
+          return respond('Writing the Express router and the client API helper.', [
+            call('write_file', { path: routePath, content: files[routePath] }),
+            call('write_file', { path: 'client/src/lib/api.js', content: files['client/src/lib/api.js'] }),
+          ]);
+        }
+        return respond('API done.', [call('finalize', { summary: 'Built the REST API.' })]);
+      }
+
+      if (system.includes('build the UI')) {
+        if (step === 1) {
+          return respond('Writing the React components and the app shell.', [
+            call('write_file', { path: componentPath, content: files[componentPath] }),
+            call('write_file', { path: 'client/src/App.jsx', content: files['client/src/App.jsx'] }),
+          ]);
+        }
+        return respond('UI done.', [call('finalize', { summary: 'Built the React interface.' })]);
+      }
+
+      if (system.includes('review what has been built')) {
+        if (step === 1) {
+          return respond('Listing the files.', [call('list_files', {})]);
+        }
+        return respond(
+          'The project is consistent: the entity in the schema matches the route, ' +
+            'the client helper and the React list. Accessibility labels are present.',
+          [call('finalize', { summary: 'Reviewed every file: no blocking defects found.' })]
+        );
+      }
+
+      if (system.includes('verify the app')) {
+        if (step === 1) {
+          return respond('Writing the smoke test and the manual checklist.', [
+            call('write_file', {
+              path: 'server/test/smoke.test.mjs',
+              content:
+                "import assert from 'node:assert/strict';\n\n" +
+                "assert.equal(typeof 'generated', 'string');\n" +
+                "console.log('smoke test passed');\n",
+            }),
+            call('write_file', {
+              path: 'server/test/MANUAL.md',
+              content:
+                '# Manual test plan\n\n1. Run the app.\n2. Create a record.\n3. Edit it.\n4. Delete it.\n',
+            }),
+          ]);
+        }
+        return respond('Tests written.', [
+          call('finalize', { summary: 'Wrote a smoke test and a manual checklist.' }),
+        ]);
+      }
+
+      return respond('Nothing to do.', [call('finalize', { summary: 'Nothing to do.' })]);
+    }
+
+    /* ----------------------------- main agent ----------------------------- */
+    switch (step) {
+      case 1:
+        return respond(
+          'Starting with the data model: I will write the schema first, then the API, then the UI.',
+          [
+            call('write_file', { path: 'README.md', content: files['README.md'] }),
+            call('write_file', { path: 'server/schema.sql', content: files['server/schema.sql'] }),
+          ]
+        );
+      case 2:
+        return respond('Schema is in place. Now the Express routes and the client API helper.', [
+          call('write_file', { path: routePath, content: files[routePath] }),
+          call('write_file', { path: 'client/src/lib/api.js', content: files['client/src/lib/api.js'] }),
+        ]);
+      case 3:
+        return respond('API is wired. Now the React component and the app shell.', [
+          call('write_file', { path: componentPath, content: files[componentPath] }),
+          call('write_file', { path: 'client/src/App.jsx', content: files['client/src/App.jsx'] }),
+        ]);
+      case 4:
+        return respond('Everything is written. Let me have a reviewer check the code before I finish.', [
+          call('delegate', {
+            subagent: 'reviewer',
+            task: `Review the project generated for: "${prompt}". Report concrete defects.`,
+          }),
+        ]);
+      case 5:
+        return respond('Review looks good. Finalising the build.', [
+          call('finalize', { summary: app.summary }),
+        ]);
+      default:
+        return respond('Done.', [call('finalize', { summary: app.summary })]);
+    }
+  };
+}

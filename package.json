@@ -15,7 +15,10 @@
     "start": "npm --workspace server run start",
     "seed": "npm --workspace server run seed",
     "reset": "npm --workspace server run reset",
-    "verify": "node scripts/verify-install.mjs"
+    "verify": "node scripts/verify-install.mjs",
+    "test:agent": "node scripts/test-agent.mjs",
+    "test:provider": "node scripts/test-provider.mjs",
+    "fake:llm": "node scripts/fake-openai.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

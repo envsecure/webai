@@ -1498,6 +1498,97 @@ svg {
 }
 
 /* ==========================================================================
+   Agent activity feed
+   ========================================================================== */
+
+.feed {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12.5px;
+}
+
+.feed__row {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 5px 9px;
+  border-radius: 8px;
+  background: var(--muted);
+  color: var(--fg-muted);
+  animation: fade-in 0.2s ease;
+}
+
+.feed__row--phase {
+  background: transparent;
+  color: var(--fg);
+  font-weight: 600;
+  text-transform: capitalize;
+  padding-left: 0;
+}
+
+.feed__row--iteration {
+  background: transparent;
+  color: var(--fg-subtle);
+  padding-left: 0;
+}
+
+.feed__row--tool {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+
+.feed__row--subagent {
+  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+  color: var(--accent-foreground);
+}
+
+.feed__row--compact {
+  background: color-mix(in srgb, var(--destructive) 10%, transparent);
+  color: var(--destructive);
+}
+
+.feed__row--warn {
+  background: color-mix(in srgb, var(--destructive) 12%, transparent);
+  color: var(--destructive);
+}
+
+.feed__row--done {
+  background: color-mix(in srgb, var(--success) 14%, transparent);
+  color: var(--success);
+}
+
+.feed__row--message {
+  white-space: pre-wrap;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--fg);
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+}
+
+.agent-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.agent-meta__item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  padding: 4px 10px;
+  font-size: 11.5px;
+  color: var(--fg-muted);
+  background: var(--bg-elevated);
+}
+
+/* ==========================================================================
    Misc
    ========================================================================== */
 

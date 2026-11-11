@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import api from '../lib/api.js';
+import { describeEvent, streamChat } from '../lib/agent.js';
 
 const TABS = [
   { id: 'preview', label: 'Preview' },
@@ -14,11 +15,15 @@ export default function Builder() {
   const [messages, setMessages] = useState([]);
   const [versions, setVersions] = useState([]);
   const [files, setFiles] = useState({});
+  const [plan, setPlan] = useState([]);
   const [tab, setTab] = useState('preview');
   const [activeFile, setActiveFile] = useState(null);
   const [prompt, setPrompt] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [feed, setFeed] = useState([]);
+  const [agentInfo, setAgentInfo] = useState(null);
+  const [showFeed, setShowFeed] = useState(true);
   const endRef = useRef(null);
 
   async function load() {
@@ -26,56 +31,102 @@ export default function Builder() {
     setProject(res.project);
     const list = res.versions || [];
     setVersions(list);
-    // Show the most recent generated build straight away.
     if (list.length && Object.keys(files).length === 0) {
       setFiles(list[0].code || {});
       setActiveFile(Object.keys(list[0].code || {})[0] || null);
     }
     const msg = await api.projectMessages(projectId);
     setMessages(msg.messages || []);
+    const lastAssistant = [...(msg.messages || [])].reverse().find((m) => m.role === 'assistant');
+    if (lastAssistant?.meta?.plan) setPlan(lastAssistant.meta.plan);
+    if (lastAssistant?.meta?.agent) setAgentInfo(lastAssistant.meta.agent);
   }
 
   useEffect(() => {
     load().catch((err) => setError(err.message));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length]);
+  }, [messages.length, feed.length]);
 
   const fileList = useMemo(() => Object.keys(files), [files]);
 
-  async function send(event) {
+  async function send(event, textOverride) {
     event?.preventDefault();
-    const text = prompt.trim();
+    const text = (textOverride ?? prompt).trim();
     if (!text || busy) return;
     setBusy(true);
     setError('');
     setPrompt('');
+    setFeed([]);
+    setShowFeed(true);
     setMessages((m) => [...m, { id: `tmp-${Date.now()}`, role: 'user', content: text }]);
+
     try {
-      const res = await api.chat(projectId, { prompt: text });
-      setFiles(res.files || {});
-      setMessages(res.messages || []);
-      setVersions((await api.versions(projectId)).versions || []);
-      setProject((await api.getProject(projectId)).project);
+      await streamChat(projectId, text, {
+        onEvent: (evt) => {
+          if (evt.type === 'agent_event') {
+            const described = describeEvent(evt.event);
+            if (described) {
+              setFeed((f) => [...f, { ...described, id: `${Date.now()}-${f.length}` }]);
+            }
+          } else if (evt.type === 'user_message') {
+            setFeed((f) => [...f, { kind: 'phase', text: 'Phase: build', id: `phase-${f.length}` }]);
+          }
+        },
+      });
+
+      const [msg, vers] = await Promise.all([
+        api.projectMessages(projectId),
+        api.versions(projectId),
+      ]);
+      setMessages(msg.messages || []);
+      setVersions(vers.versions || []);
+      const updated = await api.getProject(projectId);
+      setProject(updated.project);
+      const latest = (vers.versions || [])[0];
+      if (latest) {
+        setFiles(latest.code || {});
+        setActiveFile(Object.keys(latest.code || {})[0] || null);
+      }
+      const lastAssistant = [...(msg.messages || [])].reverse().find((m) => m.role === 'assistant');
+      if (lastAssistant?.meta?.plan) setPlan(lastAssistant.meta.plan);
+      if (lastAssistant?.meta?.agent) setAgentInfo(lastAssistant.meta.agent);
       setTab('preview');
     } catch (err) {
-      setError(err.message || 'Build failed');
+      setError(err.message || 'The build failed');
     } finally {
       setBusy(false);
     }
   }
 
+  // A project created from a prompt starts its build as soon as it is opened.
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (!project || autoStarted.current) return;
+    if (project.prompt && versions.length === 0) {
+      autoStarted.current = true;
+      send(null, project.prompt);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project, versions.length]);
+
   async function restoreVersion(version) {
     setFiles(version.code || {});
+    setActiveFile(Object.keys(version.code || {})[0] || null);
     setTab('code');
   }
 
   if (!project) {
     return (
       <div className="app-main" style={{ paddingTop: 60 }}>
-        {error ? <div className="alert alert--error">{error}</div> : <div className="skeleton" style={{ height: 240 }} />}
+        {error ? (
+          <div className="alert alert--error">{error}</div>
+        ) : (
+          <div className="skeleton" style={{ height: 240 }} />
+        )}
       </div>
     );
   }
@@ -102,7 +153,7 @@ export default function Builder() {
             <div className="empty" style={{ padding: 32 }}>
               <p style={{ fontWeight: 600, color: 'var(--fg)' }}>Start building</p>
               <p style={{ marginTop: 6, fontSize: 14 }}>
-                Ask for a feature and the app is regenerated with it.
+                Ask for a feature and the agent plans it, writes the files and reviews its own work.
               </p>
             </div>
           )}
@@ -120,19 +171,61 @@ export default function Builder() {
                   ))}
                 </div>
               )}
+              {m.meta?.agent && (
+                <div className="agent-meta">
+                  <span className="agent-meta__item">
+                    {m.meta.agent.provider || 'local'}
+                    {m.meta.agent.model ? ` · ${m.meta.agent.model}` : ''}
+                  </span>
+                  {m.meta.agent.iterations ? (
+                    <span className="agent-meta__item">{m.meta.agent.iterations} iterations</span>
+                  ) : null}
+                  {m.meta.agent.usage?.total_tokens ? (
+                    <span className="agent-meta__item">{m.meta.agent.usage.total_tokens} tokens</span>
+                  ) : null}
+                  {(m.meta.agent.subagents || []).map((s) => (
+                    <span className="agent-meta__item" key={s.id}>
+                      ↳ {s.label} ({s.iterations})
+                    </span>
+                  ))}
+                  {m.meta.agent.usedFallback ? (
+                    <span className="agent-meta__item">local generator fallback</span>
+                  ) : null}
+                </div>
+              )}
               <span className="msg__meta">
                 {m.role} · {new Date(m.createdAt).toLocaleTimeString()}
               </span>
             </div>
           ))}
 
-          {busy && (
-            <div className="msg msg--assistant">
-              <div className="msg__bubble row" style={{ gap: 10 }}>
-                <span className="spinner" /> Building your app…
-              </div>
+          {(feed.length > 0 || busy) && (
+            <div className="stack" style={{ gap: 8 }}>
+              <button
+                className="btn btn--quiet btn--sm"
+                style={{ alignSelf: 'flex-start' }}
+                onClick={() => setShowFeed((v) => !v)}
+              >
+                {showFeed ? '▾' : '▸'} Agent activity
+                {busy ? ' · running…' : ''}
+              </button>
+              {showFeed && (
+                <div className="feed">
+                  {feed.map((row) => (
+                    <div className={`feed__row feed__row--${row.kind}`} key={row.id}>
+                      <span>{row.text}</span>
+                    </div>
+                  ))}
+                  {busy && (
+                    <div className="feed__row feed__row--iteration">
+                      <span className="spinner" /> working…
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
+
           <div ref={endRef} />
         </div>
 
@@ -150,7 +243,7 @@ export default function Builder() {
             }}
           />
           <button className="btn btn--accent" type="submit" disabled={!prompt.trim() || busy}>
-            Send
+            {busy ? <span className="spinner" /> : 'Send'}
           </button>
         </form>
         {error && (
@@ -189,11 +282,25 @@ export default function Builder() {
 
         {tab === 'preview' && (
           <div style={{ padding: 20, overflow: 'auto' }}>
+            {plan.length > 0 && (
+              <div className="plan" style={{ marginBottom: 18 }}>
+                <div className="eyebrow" style={{ marginBottom: 8 }}>
+                  Build plan
+                </div>
+                {plan.map((step) => (
+                  <div className="plan__row" key={step.step}>
+                    <span className="plan__step">{step.step}</span>
+                    <span className="plan__detail">{step.detail}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {fileList.length === 0 ? (
               <div className="empty" style={{ padding: 48, textAlign: 'center' }}>
                 <p style={{ fontWeight: 600, color: 'var(--fg)' }}>Nothing generated yet</p>
                 <p style={{ marginTop: 6, fontSize: 14 }}>
-                  Send a message to generate the app files.
+                  Send a message and the agent will plan, write and review an app.
                 </p>
               </div>
             ) : (
@@ -208,15 +315,43 @@ export default function Builder() {
                   ))}
                 </div>
                 <div className="stack" style={{ marginTop: 20 }}>
-                  {Object.entries(files).map(([name, content]) => (
+                  {fileList.map((name) => (
                     <details key={name}>
                       <summary style={{ cursor: 'pointer', fontSize: 14 }}>{name}</summary>
-                      <pre className="code" style={{ marginTop: 8, borderRadius: 12, background: 'var(--muted)' }}>
-                        {content}
+                      <pre
+                        className="code"
+                        style={{ marginTop: 8, borderRadius: 12, background: 'var(--muted)' }}
+                      >
+                        {files[name]}
                       </pre>
                     </details>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {agentInfo && (
+              <div className="agent-meta" style={{ marginTop: 18 }}>
+                <span className="agent-meta__item">
+                  provider: {agentInfo.provider || 'local'}
+                  {agentInfo.model ? ` (${agentInfo.model})` : ''}
+                </span>
+                {agentInfo.iterations ? (
+                  <span className="agent-meta__item">{agentInfo.iterations} iterations</span>
+                ) : null}
+                {agentInfo.usage?.total_tokens ? (
+                  <span className="agent-meta__item">{agentInfo.usage.total_tokens} tokens</span>
+                ) : null}
+                {agentInfo.context?.compactions ? (
+                  <span className="agent-meta__item">
+                    {agentInfo.context.compactions} context compaction(s)
+                  </span>
+                ) : null}
+                {(agentInfo.subagents || []).map((s) => (
+                  <span className="agent-meta__item" key={s.id}>
+                    ↳ {s.label}: {s.iterations} iteration(s)
+                  </span>
+                ))}
               </div>
             )}
           </div>

@@ -50,7 +50,8 @@ export default function PromptBox({ compact = false, autoFocus = false, cta = 'B
 
     setBusy(true);
     try {
-      const res = await api.quickBuild(text);
+      // Create the project first so the builder can stream the agent run.
+      const res = await api.createProject({ prompt: text });
       navigate(`/app/project/${res.project.id}`);
     } catch (err) {
       setError(err.message || 'Could not start the build');

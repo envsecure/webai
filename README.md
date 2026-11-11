@@ -18,6 +18,70 @@ you iterate with follow-up messages.
 | Backend  | Node.js, Express 4, CORS, ESM modules                         |
 | Database | SQLite via `better-sqlite3` (falls back to `node:sqlite`)    |
 | Auth     | scrypt password hashing + opaque session tokens in the DB     |
+| Agent    | Tool-use loop with context compaction and subagents           |
+
+---
+
+## The build agent
+
+The builder is not a template filler — it runs an agent loop against a real
+model when one is configured.
+
+```
+prompt ─► plan ─► ┌─ tool call ─► write/read/list/delete ─┐
+                  │                                       │
+                  └──────────── observe ───────────────────┘
+                              │
+                  context compacted when the window fills
+                              │
+                  delegate ──► subagent (own context, own budget)
+                              │
+                  review ──► findings fed back for a fix pass
+```
+
+| Piece                | File                                       | What it does                                                                 |
+| -------------------- | ------------------------------------------ | ---------------------------------------------------------------------------- |
+| Agent loop           | `server/src/services/llm/agent.js`          | plan → act → observe → refine, bounded iterations, review round             |
+| Context window       | `server/src/services/llm/context.js`        | token budget, rolling summary, compaction, deterministic fallback            |
+| Subagents            | `server/src/services/llm/subagents.js`      | db designer, API engineer, frontend engineer, code reviewer, QA engineer      |
+| Tools                | `server/src/services/llm/tools.js`          | sandboxed file workspace (no path traversal), `finalize`, `delegate`          |
+| Providers            | `server/src/services/llm/providers.js`      | OpenAI, Anthropic, OpenRouter, Groq, Together, Ollama, any compatible gateway |
+| Client               | `server/src/services/llm/client.js`         | retries, backoff, timeouts, wire-format normalisation                        |
+| Orchestration        | `server/src/services/build.js`              | runs the agent, falls back to the local generator on failure                 |
+
+### Configuring a model
+
+Settings → **AI model**, or the environment:
+
+| Variable                                   | Meaning                                     |
+| ------------------------------------------ | ------------------------------------------- |
+| `LLM_PROVIDER`                             | `openai`, `anthropic`, `openrouter`, `groq`, `together`, `ollama`, `compatible`, `mock` |
+| `LLM_BASE_URL`                             | Override the provider base URL              |
+| `LLM_API_KEY`                              | API key (provider-specific vars also work) |
+| `LLM_MODEL`                                | Model name                                  |
+| `LLM_MAX_ITERATIONS`                       | Agent loop budget (default 12)             |
+| `LLM_REVIEW_ROUNDS`                        | Self-review rounds (default 1)              |
+| `LLM_CONTEXT_TOKENS`                       | Context window size (default 24000)         |
+
+Per-user keys are encrypted with AES-256-GCM before they are stored. With no
+provider configured the app uses the **offline mock agent** — the same loop, the
+same tools, the same subagents, but the "model" is local, so nothing leaves the
+machine and the app always works.
+
+### Streaming
+
+`POST /api/projects/:id/chat/stream` returns newline-delimited JSON as the
+agent works: `plan`, `iteration`, `tool_start`, `tool_call`, `message`,
+`context_compacted`, `subagent_start`, `subagent_end`, `review_rework`,
+`finalize`, `done`, `result`. The builder renders this as a live activity feed.
+
+### Tests
+
+```bash
+npm run test:agent                     # loop, subagents, review, compaction, streaming
+npm run fake:llm &                     # a local OpenAI-compatible server
+npm run test:provider                  # the real HTTP provider path
+```
 
 ---
 
@@ -61,20 +125,25 @@ lovable-clone/
 │   │   │   ├── postgres.js   # Postgres driver (drop-in swap)
 │   │   │   ├── schema.sql    # table definitions
 │   │   │   └── seed.js       # templates, community projects, demo user
-│   │   ├── lib/              # auth helpers, id/hash utilities
+│   │   ├── lib/              # auth helpers, id/hash utilities, secret encryption
 │   │   ├── repositories/     # SQL lives here, nothing else
 │   │   ├── routes/           # auth, projects, catalog, settings
-│   │   └── services/         # generator.js — prompt -> app files
+│   │   └── services/
+│   │       ├── build.js      # orchestration + fallback
+│   │       ├── generator.js  # deterministic starter generator + mock agent
+│   │       └── llm/          # agent loop, context, subagents, tools, providers
 │   └── public/
 ├── client/
 │   ├── src/
 │   │   ├── main.jsx, App.jsx
 │   │   ├── components/       # Brand, Nav, Footer, PromptBox
 │   │   ├── pages/            # Landing, Pricing, Templates, Community,
-│   │   │                     # Auth, Dashboard, Builder
+│   │   │                     # Auth, Dashboard, Builder, Settings
 │   │   ├── lib/api.js        # fetch wrapper + token handling
+│   │   ├── lib/agent.js      # NDJSON stream reader + event formatting
 │   │   └── styles.css        # design tokens + all component styles
 │   └── vite.config.js
+├── scripts/                  # verify-install, test-agent, test-provider, fake-openai
 └── rea-evidence/             # REA capture evidence used for the rebuild
 ```
 
@@ -99,14 +168,17 @@ All `/api/projects`, `/api/settings` and `/api/api-keys` routes require
 | GET    | `/api/projects/:id`              | Project, chats and versions                  |
 | PATCH  | `/api/projects/:id`              | Rename / update a project                    |
 | DELETE | `/api/projects/:id`              | Delete a project                             |
-| GET    | `/api/projects/:id/messages`     | Chat history                                 |
+| `GET    | `/api/projects/:id/messages`     | Chat history                                 |
 | GET    | `/api/projects/:id/versions`     | Version history with generated code          |
+| POST   | `/api/projects/:id/chat`         | Follow-up prompt -> agent loop -> regenerate  |
+| POST   | `/api/projects/:id/chat/stream`  | Same, streaming agent events as NDJSON       |
 | GET    | `/api/templates`                 | Template gallery (`?category=`, `?search=`)  |
 | POST   | `/api/templates/:id/install`     | Increment the install counter                |
 | GET    | `/api/community`                 | Community projects (`?search=`)              |
 | POST   | `/api/community/:id/like`        | Like a community project                     |
-| GET    | `/api/settings`                  | User settings                                |
-| PUT    | `/api/settings`                  | Update settings                              |
+| GET    | `/api/settings`                  | User settings + resolved model configuration |
+| PUT    | `/api/settings`                  | Update settings (incl. model + API key)       |
+| POST   | `/api/settings/test-llm`         | Check the configured model is reachable       |
 | GET    | `/api/api-keys`                  | List API keys                                |
 | POST   | `/api/api-keys`                  | Create an API key (shown once)               |
 | DELETE | `/api/api-keys/:id`              | Revoke an API key                            |

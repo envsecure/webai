@@ -118,5 +118,14 @@ CREATE TABLE IF NOT EXISTS settings (
   theme      TEXT NOT NULL DEFAULT 'dark',
   editor_theme TEXT NOT NULL DEFAULT 'dark',
   autoplay   INTEGER NOT NULL DEFAULT 1,
+  -- AI model configuration (per user). llm_api_key holds an encrypted value.
+  llm_provider TEXT,
+  llm_model TEXT,
+  llm_base_url TEXT,
+  llm_api_key TEXT,
+  llm_max_iterations INTEGER NOT NULL DEFAULT 12,
+  llm_review_rounds INTEGER NOT NULL DEFAULT 1,
+  llm_subagents INTEGER NOT NULL DEFAULT 1,
+  llm_context_tokens INTEGER NOT NULL DEFAULT 24000,
   updated_at TEXT NOT NULL
 );

@@ -43,15 +43,18 @@ export function safeEqual(a, b) {
   return crypto.timingSafeEqual(bufA, bufB);
 }
 
-/** Derive a readable project name from a natural-language prompt. */
+/**
+ * Derive a readable project name from a natural-language prompt.
+ * Leading verbs and articles are dropped and dangling connectors trimmed.
+ */
 export function titleFromPrompt(prompt) {
   const cleaned = String(prompt || '')
     .replace(/^(build|create|make|generate|design|develop|write)\s+(me\s+)?(an|a|the)\s+/i, '')
     .replace(/\s+/g, ' ')
     .trim();
   if (!cleaned) return 'Untitled project';
+
   const words = cleaned.split(' ').slice(0, 6);
-  // Drop dangling connectors so the title reads naturally.
   while (words.length > 2 && /^(and|or|with|for|to|of|in|on|that|the|a|an)$/i.test(words[words.length - 1])) {
     words.pop();
   }

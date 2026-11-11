@@ -103,6 +103,7 @@ export const api = {
   // settings
   settings: () => request('/settings'),
   saveSettings: (data) => request('/settings', { method: 'PUT', body: data }),
+  testLlm: () => request('/settings/test-llm', { method: 'POST', body: {} }),
   apiKeys: () => request('/api-keys'),
   createApiKey: (label) => request('/api-keys', { method: 'POST', body: { label } }),
   deleteApiKey: (id) => request(`/api-keys/${id}`, { method: 'DELETE' }),
