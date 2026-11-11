@@ -51,11 +51,11 @@ prompt ─► plan ─► ┌─ tool call ─► write/read/list/delete ─┐
 
 ### Configuring a model
 
-Settings → **AI model**, or the environment:
+Settings → **Model connection**, or the environment:
 
 | Variable                                   | Meaning                                     |
 | ------------------------------------------ | ------------------------------------------- |
-| `LLM_PROVIDER`                             | `openai`, `anthropic`, `openrouter`, `groq`, `together`, `ollama`, `compatible`, `mock` |
+| `LLM_PROVIDER`                             | `openai`, `anthropic`, `openrouter`, `groq`, `together`, `ollama`, `compatible` |
 | `LLM_BASE_URL`                             | Override the provider base URL              |
 | `LLM_API_KEY`                              | API key (provider-specific vars also work) |
 | `LLM_MODEL`                                | Model name                                  |
@@ -64,9 +64,8 @@ Settings → **AI model**, or the environment:
 | `LLM_CONTEXT_TOKENS`                       | Context window size (default 24000)         |
 
 Per-user keys are encrypted with AES-256-GCM before they are stored. With no
-provider configured the app uses the **offline mock agent** — the same loop, the
-same tools, the same subagents, but the "model" is local, so nothing leaves the
-machine and the app always works.
+provider configured there is **no model**, and the app says so instead of
+building something fake.
 
 ### Streaming
 
@@ -81,6 +80,7 @@ agent works: `plan`, `iteration`, `tool_start`, `tool_call`, `message`,
 npm run test:agent                     # loop, subagents, review, compaction, streaming
 npm run fake:llm &                     # a local OpenAI-compatible server
 npm run test:provider                  # the real HTTP provider path
+npm run test:setup                     # no model -> clear error -> detect -> connect -> build
 ```
 
 ---
@@ -89,7 +89,7 @@ npm run test:provider                  # the real HTTP provider path
 
 ```bash
 npm install          # installs the server + client workspaces
-npm run seed         # creates data/app.db, seeds templates + demo account
+npm run seed         # creates data/app.db and loads the template gallery
 npm run build        # builds the client into client/dist
 npm start            # serves API + client on http://localhost:3001
 ```
@@ -100,7 +100,8 @@ Dev mode with hot reload (Vite on :5173, API on :3001):
 npm run dev
 ```
 
-Demo account: **demo@lovable.dev** / **demo1234**
+There is no demo account: sign up, then connect your own model in **Settings → Model
+connection** (any OpenAI-compatible endpoint). Nothing is built until a model is connected.
 
 > **Deploying to a machine?** See **[docs/RUNNING.md](docs/RUNNING.md)** — the full
 > guide: VPS with systemd + nginx + HTTPS, Docker, the Postgres switch, backups,
@@ -183,6 +184,9 @@ All `/api/projects`, `/api/settings` and `/api/api-keys` routes require
 | POST   | `/api/api-keys`                  | Create an API key (shown once)               |
 | DELETE | `/api/api-keys/:id`              | Revoke an API key                            |
 | GET    | `/api/stats`                     | Public counters                              |
+| GET    | `/api/llm/status`                | Whether a model is available (no secrets)    |
+| POST   | `/api/settings/detect-model`     | Probe an endpoint: models, context, tools    |
+| POST   | `/api/settings/list-models`      | The endpoint's model catalogue               |
 | GET    | `/api/health`                    | Health check                                 |
 
 ---

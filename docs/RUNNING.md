@@ -33,14 +33,16 @@ git clone https://github.com/envsecure/webai.git
 cd webai
 
 npm install        # installs the server + client workspaces
-npm run seed       # creates data/app.db and loads templates + a demo account
+npm run seed       # creates data/app.db and loads the template gallery
 npm run build      # builds the React client into client/dist
 npm start          # serves API + client on http://localhost:3001
 ```
 
 Open <http://localhost:3001>.
 
-**Demo login:** `demo@lovable.dev` / `demo1234`
+**No demo account.** Sign up in the app, then connect your model in
+**Settings → Model connection**. Until a model is connected the build endpoints
+answer with `no_model_configured` and the UI points you at the settings page.
 
 Check it is alive:
 
@@ -249,7 +251,7 @@ To publish it behind nginx, add a `webai` service to your compose file and proxy
 | `DATABASE_URL`      | —                           | Postgres connection string                     |
 | `AUTH_SECRET`       | dev fallback                | HMAC secret — **always set this in production**|
 | `AUTH_TOKEN_TTL`    | `2592000`                   | Session lifetime in seconds (30 days)          |
-| `LLM_PROVIDER`      | auto                        | `openai`, `anthropic`, `openrouter`, `groq`, `together`, `ollama`, `compatible`, `mock` |
+| `LLM_PROVIDER`      | auto                        | `openai`, `anthropic`, `openrouter`, `groq`, `together`, `ollama`, `compatible` |
 | `LLM_API_KEY`       | —                           | Model API key (provider-specific vars also work) |
 | `LLM_BASE_URL`      | provider default            | Override the provider base URL                 |
 | `LLM_MODEL`         | provider default            | Model name                                     |
@@ -270,9 +272,9 @@ LLM_PROVIDER=openai OPENAI_API_KEY=sk-... npm start
 # or per user: Settings -> AI model -> provider, model, API key
 ```
 
-With no provider configured the app uses the offline mock agent: the same loop,
-tools and subagents, but the model is local, so nothing leaves the machine.
-Check what is active:
+With no provider configured there is **no model**: the build endpoints answer
+`409 no_model_configured` and the UI points at the settings page. Nothing is
+built with a stand-in. Check what is active:
 
 ```bash
 curl -s https://your-domain.com/api/health

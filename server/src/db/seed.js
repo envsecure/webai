@@ -1,7 +1,6 @@
 import { initDatabase, db } from './index.js';
 import { upsertCommunityProject, upsertTemplate } from '../repositories/catalog.js';
-import { hashPassword, id, nowIso } from '../lib/util.js';
-import { createProject, createChat, createMessage } from '../repositories/projects.js';
+import { id, nowIso } from '../lib/util.js';
 
 const TEMPLATES = [
   {
@@ -194,51 +193,6 @@ const COMMUNITY = [
   },
 ];
 
-async function seedDemoUser() {
-  const email = 'demo@lovable.dev';
-  const existing = await db().get('SELECT * FROM users WHERE email = ?', [email]);
-  if (existing) return existing;
-
-  const user = {
-    id: id('usr'),
-    email,
-    name: 'Demo User',
-    passwordHash: hashPassword('demo1234'),
-    plan: 'free',
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
-  };
-  await db().run(
-    `INSERT INTO users (id, email, name, password_hash, plan, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [user.id, user.email, user.name, user.passwordHash, user.plan, user.createdAt, user.updatedAt]
-  );
-  await db().run(
-    'INSERT INTO settings (user_id, theme, editor_theme, autoplay, updated_at) VALUES (?, ?, ?, ?, ?)',
-    [user.id, 'dark', 'dark', 1, nowIso()]
-  );
-
-  const project = await createProject(user.id, {
-    name: 'Habit tracker',
-    description: 'A small app to track daily habits and streaks.',
-    prompt: 'Build a habit tracker with daily check-ins and streaks',
-    status: 'ready',
-  });
-  const chat = await createChat(user.id, project.id, 'Build chat');
-  await createMessage(user.id, chat.id, project.id, {
-    role: 'user',
-    content: 'Build a habit tracker with daily check-ins and streaks',
-  });
-  await createMessage(user.id, chat.id, project.id, {
-    role: 'assistant',
-    content:
-      'Built Habit tracker — a Starter app with a React UI, an Express API and a SQLite schema (items table).',
-    meta: { appType: 'starter' },
-  });
-
-  return user;
-}
-
 async function main() {
   await initDatabase({ silent: true });
 
@@ -249,8 +203,6 @@ async function main() {
     await upsertCommunityProject({ ...project, createdAt: nowIso() });
   }
 
-  const user = await seedDemoUser();
-
   const counts = {
     templates: (await db().get('SELECT COUNT(*) AS c FROM templates'))?.c,
     community: (await db().get('SELECT COUNT(*) AS c FROM community_projects'))?.c,
@@ -259,7 +211,7 @@ async function main() {
   };
 
   console.log('[seed] done', counts);
-  console.log(`[seed] demo login -> ${user.email} / demo1234`);
+  console.log('[seed] no accounts created - sign up in the app, then connect your model in Settings');
 }
 
 main()

@@ -101,6 +101,21 @@ function decide(messages, hasTools) {
 }
 
 const server = http.createServer((req, res) => {
+  if (req.url.endsWith('/models')) {
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(
+      JSON.stringify({
+        object: 'list',
+        data: [
+          { id: 'fake-model', context_length: 32768, owned_by: 'local' },
+          { id: 'fake-model-large', context_length: 131072, owned_by: 'local' },
+          { id: 'fake-model-tiny', context_length: 4096, owned_by: 'local' },
+        ],
+      })
+    );
+    return;
+  }
+
   if (!req.url.endsWith('/chat/completions')) {
     res.writeHead(404).end('not found');
     return;

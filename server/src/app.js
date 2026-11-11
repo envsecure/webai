@@ -43,6 +43,28 @@ export function createApp() {
     }
   });
 
+  /**
+   * Public, secret-free view of whether a model is available.
+   * Used by the landing page and the prompt box to tell a visitor what to do.
+   */
+  app.get('/api/llm/status', async (_req, res, next) => {
+    try {
+      const { resolveLlmSettings } = await import('./services/llm/index.js');
+      const env = resolveLlmSettings({});
+      res.json({
+        serverConfigured: Boolean(env.configured && env.provider),
+        provider: env.provider,
+        providerLabel: env.providerLabel,
+        model: env.model,
+        source: env.source,
+        // A visitor always needs their own account to build.
+        requiresAccount: true,
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+
   app.use('/api/auth', authRoutes);
   app.use('/api/projects', projectRoutes);
   app.use('/api', catalogRoutes);

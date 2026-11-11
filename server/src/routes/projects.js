@@ -19,11 +19,26 @@ import {
   updateProject,
 } from '../repositories/projects.js';
 import { getUserSettings } from '../repositories/settings.js';
-import { buildProject } from '../services/build.js';
+import { buildProject, NoModelConfiguredError } from '../services/build.js';
 import { id, nowIso, titleFromPrompt } from '../lib/util.js';
 
 const router = Router();
 router.use(requireAuth);
+
+/**
+ * Builds need a model. If none is connected, the caller says so clearly
+ * instead of pretending to build something.
+ */
+async function resolveModel(req) {
+  const settings = await getUserSettings(req.user.id);
+  const { resolveLlmSettings } = await import('../services/llm/index.js');
+  const resolved = resolveLlmSettings(settings);
+  if (!resolved.configured || !resolved.provider) return null;
+  return { settings, resolved };
+}
+
+const NO_MODEL_MESSAGE =
+  'No model is connected. Add your OpenAI-compatible API endpoint in Settings → Model connection to start building.';
 
 /* -------------------------------- projects -------------------------------- */
 
@@ -126,6 +141,15 @@ router.post('/:projectId/chat', async (req, res, next) => {
       return res.status(400).json({ error: 'invalid_prompt', message: 'Prompt cannot be empty' });
     }
 
+    const model = await resolveModel(req);
+    if (!model) {
+      return res.status(409).json({
+        error: 'no_model_configured',
+        message: NO_MODEL_MESSAGE,
+        action: 'open_settings',
+      });
+    }
+
     let chat = req.body?.chatId ? await getChat(req.user.id, req.body.chatId) : null;
     if (!chat) chat = await createChat(req.user.id, project.id, titleFromPrompt(prompt));
 
@@ -134,7 +158,7 @@ router.post('/:projectId/chat', async (req, res, next) => {
       content: prompt,
     });
 
-    const settings = await getUserSettings(req.user.id);
+    const settings = model.settings;
     const result = await buildProject({
       prompt,
       project,
@@ -235,13 +259,24 @@ router.post('/:projectId/chat/stream', async (req, res) => {
       return res.end();
     }
 
+    const model = await resolveModel(req);
+    if (!model) {
+      send({
+        type: 'error',
+        code: 'no_model_configured',
+        message: NO_MODEL_MESSAGE,
+        action: 'open_settings',
+      });
+      return res.end();
+    }
+
     let chat = req.body?.chatId ? await getChat(req.user.id, req.body.chatId) : null;
     if (!chat) chat = await createChat(req.user.id, project.id, titleFromPrompt(prompt));
 
     await createMessage(req.user.id, chat.id, project.id, { role: 'user', content: prompt });
     send({ type: 'user_message', chatId: chat.id });
 
-    const settings = await getUserSettings(req.user.id);
+    const settings = model.settings;
     const result = await buildProject({
       prompt,
       project,
@@ -336,6 +371,15 @@ router.post('/quick-build', async (req, res, next) => {
     if (!prompt) {
       return res.status(400).json({ error: 'invalid_prompt', message: 'Prompt cannot be empty' });
     }
+    const model = await resolveModel(req);
+    if (!model) {
+      return res.status(409).json({
+        error: 'no_model_configured',
+        message: NO_MODEL_MESSAGE,
+        action: 'open_settings',
+      });
+    }
+
     const project = await createProject(req.user.id, {
       name: titleFromPrompt(prompt),
       prompt,
@@ -344,7 +388,7 @@ router.post('/quick-build', async (req, res, next) => {
     const chat = await createChat(req.user.id, project.id, 'Build chat');
     await createMessage(req.user.id, chat.id, project.id, { role: 'user', content: prompt });
 
-    const settings = await getUserSettings(req.user.id);
+    const settings = model.settings;
     const result = await buildProject({
       prompt,
       project,

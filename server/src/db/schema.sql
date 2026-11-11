@@ -127,5 +127,6 @@ CREATE TABLE IF NOT EXISTS settings (
   llm_review_rounds INTEGER NOT NULL DEFAULT 1,
   llm_subagents INTEGER NOT NULL DEFAULT 1,
   llm_context_tokens INTEGER NOT NULL DEFAULT 24000,
+  llm_capabilities TEXT,
   updated_at TEXT NOT NULL
 );

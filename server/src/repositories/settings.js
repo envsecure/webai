@@ -14,6 +14,7 @@ const FIELDS = [
   'llm_review_rounds',
   'llm_subagents',
   'llm_context_tokens',
+  'llm_capabilities',
 ];
 
 export async function getUserSettings(userId) {
@@ -69,6 +70,7 @@ export function publicSettings(row) {
       reviewRounds: row.llm_review_rounds,
       subagents: Boolean(row.llm_subagents),
       contextTokens: row.llm_context_tokens,
+      capabilities: row.llm_capabilities ? JSON.parse(row.llm_capabilities) : null,
     },
     updatedAt: row.updated_at,
   };

@@ -76,6 +76,7 @@ export const PROVIDERS = {
     envKey: 'LLM_API_KEY',
   },
   // Offline scripted provider: exercises the whole agent loop with no network.
+  // Hidden from the user interface - it exists for the test suite only.
   mock: {
     id: 'mock',
     label: 'Local mock (no network)',
@@ -84,17 +85,20 @@ export const PROVIDERS = {
     style: 'mock',
     keyRequired: false,
     envKey: null,
+    hidden: true,
   },
 };
 
 export function listProviders() {
-  return Object.values(PROVIDERS).map((p) => ({
-    id: p.id,
-    label: p.label,
-    defaultBaseUrl: p.defaultBaseUrl,
-    defaultModel: p.defaultModel,
-    keyRequired: p.keyRequired,
-  }));
+  return Object.values(PROVIDERS)
+    .filter((p) => !p.hidden)
+    .map((p) => ({
+      id: p.id,
+      label: p.label,
+      defaultBaseUrl: p.defaultBaseUrl,
+      defaultModel: p.defaultModel,
+      keyRequired: p.keyRequired,
+    }));
 }
 
 export function getProvider(id) {

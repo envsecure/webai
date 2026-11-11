@@ -108,12 +108,6 @@ export default function Auth({ mode = 'login' }) {
             </>
           )}
         </p>
-
-        {!isLogin && (
-          <div className="alert" style={{ marginTop: 16, fontSize: 13 }}>
-            Demo account: <strong>demo@lovable.dev</strong> / <strong>demo1234</strong>
-          </div>
-        )}
       </div>
     </section>
   );

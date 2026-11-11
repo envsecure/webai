@@ -109,6 +109,9 @@ export const api = {
   deleteApiKey: (id) => request(`/api-keys/${id}`, { method: 'DELETE' }),
 
   stats: () => request('/stats', { auth: false }),
+  llmStatus: () => request('/llm/status', { auth: false }),
+  detectModel: (payload) => request('/settings/detect-model', { method: 'POST', body: payload }),
+  listModels: (payload) => request('/settings/list-models', { method: 'POST', body: payload }),
 };
 
 export default api;

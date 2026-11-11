@@ -1,38 +1,13 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../App.jsx';
 import api from '../lib/api.js';
-
-const Icon = {
-  plus: (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  ),
-  bolt: (
-    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path
-        d="M9 1 3.5 9h4L7 15l5.5-8h-4L9 1Z"
-        fill="currentColor"
-      />
-    </svg>
-  ),
-  mic: (
-    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <rect x="6" y="1.5" width="4" height="8" rx="2" fill="currentColor" />
-      <path
-        d="M3.5 7.5a4.5 4.5 0 0 0 9 0M8 12v2.5"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      />
-    </svg>
-  ),
-};
+import { useModelStatus } from '../lib/useModelStatus.js';
 
 export default function PromptBox({ compact = false, autoFocus = false, cta = 'Build' }) {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const model = useModelStatus(user);
   const [prompt, setPrompt] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -48,16 +23,49 @@ export default function PromptBox({ compact = false, autoFocus = false, cta = 'B
       return;
     }
 
+    if (model.needsModel) {
+      setError('No model is connected yet. Add your API endpoint in Settings → AI model.');
+      return;
+    }
+
     setBusy(true);
     try {
       // Create the project first so the builder can stream the agent run.
       const res = await api.createProject({ prompt: text });
       navigate(`/app/project/${res.project.id}`);
     } catch (err) {
-      setError(err.message || 'Could not start the build');
+      if (err.status === 409 && err.payload?.error === 'no_model_configured') {
+        setError(err.payload.message);
+      } else {
+        setError(err.message || 'Could not start the build');
+      }
       setBusy(false);
     }
   }
+
+  const Icon = {
+    plus: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    ),
+    bolt: (
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M9 1 3.5 9h4L7 15l5.5-8h-4L9 1Z" fill="currentColor" />
+      </svg>
+    ),
+    mic: (
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <rect x="6" y="1.5" width="4" height="8" rx="2" fill="currentColor" />
+        <path
+          d="M3.5 7.5a4.5 4.5 0 0 0 9 0M8 12v2.5"
+          stroke="currentColor"
+          strokeWidth="1.4"
+          strokeLinecap="round"
+        />
+      </svg>
+    ),
+  };
 
   return (
     <form className="prompt" onSubmit={submit} style={compact ? { marginTop: 0 } : undefined}>
@@ -72,11 +80,42 @@ export default function PromptBox({ compact = false, autoFocus = false, cta = 'B
         }}
         aria-label="Chat input"
       />
+
       {error && (
         <div className="alert alert--error" style={{ marginBottom: 10 }}>
           {error}
+          {user && (
+            <>
+              {' '}
+              <Link to="/app/settings" style={{ textDecoration: 'underline', fontWeight: 600 }}>
+                Open settings
+              </Link>
+            </>
+          )}
         </div>
       )}
+
+      {model.needsModel && !error && (
+        <div className="alert" style={{ marginBottom: 10 }}>
+          {user ? (
+            <>
+              No model is connected yet.{' '}
+              <Link to="/app/settings" style={{ textDecoration: 'underline', fontWeight: 600 }}>
+                Add your API endpoint
+              </Link>{' '}
+              to start building.
+            </>
+          ) : (
+            <>
+              <Link to="/signup" style={{ textDecoration: 'underline', fontWeight: 600 }}>
+                Create an account
+              </Link>{' '}
+              and connect your model to start building.
+            </>
+          )}
+        </div>
+      )}
+
       <div className="prompt__bar">
         <button type="button" className="prompt__icon" title="Attach a file" aria-label="Attach a file">
           {Icon.plus}
@@ -85,18 +124,33 @@ export default function PromptBox({ compact = false, autoFocus = false, cta = 'B
           {Icon.bolt}
         </button>
         <span className="subtle" style={{ fontSize: 12 }}>
-          {user ? `Signed in as ${user.name || user.email}` : 'Sign up to start building'}
+          {user
+            ? model.ownConfigured
+              ? `Using ${model.mine?.llm?.model || model.mine?.llm?.providerLabel}`
+              : 'No model connected'
+            : 'Sign up to start building'}
         </span>
         <span className="prompt__label">{cta}</span>
         <button className="prompt__icon" type="button" title="Dictate" aria-label="Dictate">
           {Icon.mic}
         </button>
-        <button className="prompt__send" type="submit" disabled={!prompt.trim() || busy} aria-label="Build">
+        <button
+          className="prompt__send"
+          type="submit"
+          disabled={!prompt.trim() || busy}
+          aria-label="Build"
+        >
           {busy ? (
             <span className="spinner" />
           ) : (
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+              <path
+                d="M8 13V3M3.5 7.5 8 3l4.5 4.5"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
           )}
         </button>

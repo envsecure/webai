@@ -3,7 +3,14 @@ import { requireAuth } from '../lib/auth.js';
 import { db } from '../db/index.js';
 import { encryptSecret, maskSecret } from '../lib/secret.js';
 import { getUserSettings, publicSettings, updateUserSettings } from '../repositories/settings.js';
-import { describeLlm, listProviders, listSubagents, resolveLlmSettings } from '../services/llm/index.js';
+import {
+  describeLlm,
+  detectModel,
+  listModels,
+  listProviders,
+  listSubagents,
+  resolveLlmSettings,
+} from '../services/llm/index.js';
 import { id, nowIso, randomToken, sha256 } from '../lib/util.js';
 
 const router = Router();
@@ -18,6 +25,7 @@ router.get('/settings', async (req, res, next) => {
       llm: describeLlm(resolved),
       providers: listProviders(),
       subagents: listSubagents(),
+      needsSetup: !resolved.configured || !resolved.provider,
       environment: {
         providerFromEnv: Boolean(process.env.LLM_PROVIDER),
         keyFromEnv: Boolean(
@@ -32,6 +40,44 @@ router.get('/settings', async (req, res, next) => {
     });
   } catch (err) {
     next(err);
+  }
+});
+
+/**
+ * Detect what an endpoint supports: the model catalogue, the context window
+ * and whether tool calling works. Nothing is stored until the user saves.
+ */
+router.post('/settings/detect-model', async (req, res, next) => {
+  try {
+    const body = req.body || {};
+    const provider = body.provider || 'compatible';
+    const baseUrl = body.baseUrl || null;
+    const apiKey = body.apiKey || null;
+    const model = body.model || null;
+
+    if (!baseUrl) {
+      return res.status(400).json({ ok: false, message: 'Enter the base URL of your endpoint.' });
+    }
+
+    const result = await detectModel({ provider, baseUrl, apiKey, model });
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ ok: false, message: err.message });
+  }
+});
+
+/** Just the model catalogue, for the dropdown. */
+router.post('/settings/list-models', async (req, res, next) => {
+  try {
+    const body = req.body || {};
+    const result = await listModels({
+      provider: body.provider || 'compatible',
+      baseUrl: body.baseUrl,
+      apiKey: body.apiKey,
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ ok: false, models: [], message: err.message });
   }
 });
 
@@ -53,6 +99,9 @@ router.put('/settings', async (req, res, next) => {
       if (llm.reviewRounds !== undefined) patch.llm_review_rounds = Number(llm.reviewRounds) || 0;
       if (llm.subagents !== undefined) patch.llm_subagents = llm.subagents ? 1 : 0;
       if (llm.contextTokens !== undefined) patch.llm_context_tokens = Number(llm.contextTokens) || 24000;
+      if (llm.capabilities !== undefined) {
+        patch.llm_capabilities = llm.capabilities ? JSON.stringify(llm.capabilities) : null;
+      }
       // An empty string clears the stored key.
       if (llm.apiKey !== undefined) {
         patch.llm_api_key = llm.apiKey ? encryptSecret(llm.apiKey) : null;
@@ -73,11 +122,11 @@ router.post('/settings/test-llm', async (req, res, next) => {
     const row = await getUserSettings(req.user.id);
     const resolved = resolveLlmSettings(row);
 
-    if (resolved.isMock) {
-      return res.json({
-        ok: true,
-        mock: true,
-        message: 'No model provider configured - the offline mock agent will be used.',
+    if (!resolved.configured || !resolved.provider) {
+      return res.status(409).json({
+        ok: false,
+        code: 'no_model_configured',
+        message: 'No model is connected yet. Add your API endpoint first.',
       });
     }
 

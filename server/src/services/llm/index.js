@@ -1,5 +1,5 @@
 import { createLlmClient, LlmError } from './client.js';
-import { getProvider, listProviders } from './providers.js';
+import { getProvider, listProviders, safeParse } from './providers.js';
 import { decryptSecret } from '../../lib/secret.js';
 import { SUBAGENTS, listSubagents } from './subagents.js';
 
@@ -8,6 +8,7 @@ export { runAgent } from './agent.js';
 export { ProjectWorkspace, buildToolSchemas, executeTool } from './tools.js';
 export { ContextWindow, estimateTokens } from './context.js';
 export { SUBAGENTS } from './subagents.js';
+export { detectModel, listModels } from './discover.js';
 
 /** Provider keys we look for in the environment, in priority order. */
 const ENV_PROVIDER_KEYS = [
@@ -21,20 +22,53 @@ const ENV_PROVIDER_KEYS = [
 /**
  * Work out which model to use for a user.
  *
- * Precedence: the user's own settings, then the environment, then the offline
- * mock provider so the app is never dead in the water.
+ * Precedence: the user's own settings, then the environment. When neither is
+ * present the app has no model and says so - it never silently substitutes
+ * something else.
  */
 export function resolveLlmSettings(userSettings = {}) {
   const envProvider = process.env.LLM_PROVIDER;
   const detected = ENV_PROVIDER_KEYS.find(([, key]) => process.env[key])?.[0] || null;
 
-  const providerId =
-    userSettings.llm_provider ||
-    envProvider ||
-    detected ||
-    'mock';
+  const providerId = userSettings.llm_provider || envProvider || detected || null;
 
-  const provider = getProvider(providerId) || getProvider('mock');
+  if (!providerId) {
+    return {
+      provider: null,
+      providerLabel: null,
+      baseUrl: null,
+      model: null,
+      apiKey: null,
+      configured: false,
+      source: 'none',
+      isMock: false,
+      maxIterations: Number(userSettings.llm_max_iterations || process.env.LLM_MAX_ITERATIONS || 12),
+      reviewRounds: Number(userSettings.llm_review_rounds ?? process.env.LLM_REVIEW_ROUNDS ?? 1),
+      allowSubagents: String(userSettings.llm_subagents ?? '1') !== '0',
+      contextTokens: Number(userSettings.llm_context_tokens || process.env.LLM_CONTEXT_TOKENS || 24000),
+      capabilities: safeParse(userSettings.llm_capabilities),
+    };
+  }
+
+  const provider = getProvider(providerId);
+  if (!provider) {
+    return {
+      provider: null,
+      providerLabel: null,
+      baseUrl: null,
+      model: null,
+      apiKey: null,
+      configured: false,
+      source: 'none',
+      isMock: false,
+      maxIterations: 12,
+      reviewRounds: 1,
+      allowSubagents: true,
+      contextTokens: 24000,
+      capabilities: null,
+      error: `Unknown provider "${providerId}"`,
+    };
+  }
 
   const userKey = decryptSecret(userSettings.llm_api_key);
   const envKey = provider.envKey ? process.env[provider.envKey] : null;
@@ -42,8 +76,7 @@ export function resolveLlmSettings(userSettings = {}) {
 
   const apiKey = userKey || envKey || genericEnvKey || '';
   const baseUrl = userSettings.llm_base_url || process.env.LLM_BASE_URL || provider.defaultBaseUrl;
-  const model =
-    userSettings.llm_model || process.env.LLM_MODEL || provider.defaultModel;
+  const model = userSettings.llm_model || process.env.LLM_MODEL || provider.defaultModel;
 
   const configured =
     provider.id === 'mock' ? true : provider.keyRequired ? Boolean(apiKey) : true;
@@ -61,6 +94,7 @@ export function resolveLlmSettings(userSettings = {}) {
     reviewRounds: Number(userSettings.llm_review_rounds ?? process.env.LLM_REVIEW_ROUNDS ?? 1),
     allowSubagents: String(userSettings.llm_subagents ?? '1') !== '0',
     contextTokens: Number(userSettings.llm_context_tokens || process.env.LLM_CONTEXT_TOKENS || 24000),
+    capabilities: safeParse(userSettings.llm_capabilities),
   };
 }
 
@@ -89,6 +123,7 @@ export function describeLlm(settings) {
     reviewRounds: settings.reviewRounds,
     allowSubagents: settings.allowSubagents,
     contextTokens: settings.contextTokens,
+    capabilities: settings.capabilities || null,
     subagents: listSubagents(),
   };
 }

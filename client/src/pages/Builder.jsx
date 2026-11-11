@@ -23,6 +23,7 @@ export default function Builder() {
   const [error, setError] = useState('');
   const [feed, setFeed] = useState([]);
   const [agentInfo, setAgentInfo] = useState(null);
+  const [needsModel, setNeedsModel] = useState(false);
   const [showFeed, setShowFeed] = useState(true);
   const endRef = useRef(null);
 
@@ -74,6 +75,9 @@ export default function Builder() {
             }
           } else if (evt.type === 'user_message') {
             setFeed((f) => [...f, { kind: 'phase', text: 'Phase: build', id: `phase-${f.length}` }]);
+          } else if (evt.type === 'error') {
+            if (evt.code === 'no_model_configured') setNeedsModel(true);
+            setError(evt.message || 'The build failed');
           }
         },
       });
@@ -97,6 +101,9 @@ export default function Builder() {
       setTab('preview');
     } catch (err) {
       setError(err.message || 'The build failed');
+      if (err.status === 409 || err.code === 'no_model_configured') {
+        setNeedsModel(true);
+      }
     } finally {
       setBusy(false);
     }
@@ -246,7 +253,21 @@ export default function Builder() {
             {busy ? <span className="spinner" /> : 'Send'}
           </button>
         </form>
-        {error && (
+
+        {needsModel && (
+          <div className="alert alert--error" style={{ margin: '0 16px 14px' }}>
+            <strong>No model is connected.</strong> The agent needs an OpenAI-compatible endpoint
+            before it can build. Add your API endpoint, key and model in Settings → Model
+            connection.
+            <div className="row" style={{ marginTop: 10 }}>
+              <Link className="btn btn--accent btn--sm" to="/app/settings">
+                Open model settings
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {error && !needsModel && (
           <div className="alert alert--error" style={{ margin: '0 16px 14px' }}>
             {error}
           </div>
