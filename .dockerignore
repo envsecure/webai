@@ -1,0 +1,10 @@
+node_modules
+client/dist
+data
+.git
+.gitignore
+docs
+*.log
+.env
+.DS_Store
+rea-evidence

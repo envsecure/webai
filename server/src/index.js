@@ -1,8 +1,17 @@
+import fs from 'node:fs';
 import config from './config.js';
 import { initDatabase } from './db/index.js';
 import { createApp } from './app.js';
 
 async function main() {
+  // The data directory holds the database: create it with tight permissions.
+  fs.mkdirSync(config.dataDir, { recursive: true, mode: 0o750 });
+  try {
+    fs.chmodSync(config.dataDir, 0o750);
+  } catch {
+    /* permission changes need root; ignore */
+  }
+
   await initDatabase();
 
   const app = createApp();

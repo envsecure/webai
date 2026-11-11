@@ -14,7 +14,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
  */
 async function createSqliteDriver() {
   const file = config.db.sqlite.file;
-  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o750 });
 
   let Database;
   let flavour = 'better-sqlite3';

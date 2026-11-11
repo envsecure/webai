@@ -1,0 +1,39 @@
+[Unit]
+Description=webai - Lovable-style AI app builder (API + web)
+Documentation=https://github.com/envsecure/webai
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=webai
+Group=webai
+WorkingDirectory=/opt/webai
+EnvironmentFile=/opt/webai/.env
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node server/src/index.js
+Restart=always
+RestartSec=5
+TimeoutStopSec=20
+KillSignal=SIGTERM
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+ReadWritePaths=/opt/webai/data
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=webai
+
+[Install]
+WantedBy=multi-user.target

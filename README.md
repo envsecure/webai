@@ -38,6 +38,10 @@ npm run dev
 
 Demo account: **demo@lovable.dev** / **demo1234**
 
+> **Deploying to a machine?** See **[docs/RUNNING.md](docs/RUNNING.md)** — the full
+> guide: VPS with systemd + nginx + HTTPS, Docker, the Postgres switch, backups,
+> updates and troubleshooting.
+
 ---
 
 ## Project layout

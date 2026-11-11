@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import fs from 'node:fs';
 import path from 'node:path';
-import config from './config.js';
+import config, { DEFAULT_AUTH_SECRET } from './config.js';
 import { db } from './db/index.js';
 import authRoutes from './routes/auth.js';
 import projectRoutes from './routes/projects.js';
@@ -17,7 +17,15 @@ export function createApp() {
   app.use(express.urlencoded({ extended: true }));
 
   app.get('/api/health', (_req, res) => {
-    res.json({ status: 'ok', db: db().name, env: config.nodeEnv, uptime: process.uptime() });
+    res.json({
+      status: 'ok',
+      db: db().name,
+      env: config.nodeEnv,
+      uptime: process.uptime(),
+      // Tells an operator whether the deployment still uses the built-in
+      // fallback secret. The value itself is never exposed.
+      authSecret: config.auth.secret === DEFAULT_AUTH_SECRET ? 'default' : 'custom',
+    });
   });
 
   app.get('/api/stats', async (_req, res, next) => {

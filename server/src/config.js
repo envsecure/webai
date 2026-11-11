@@ -5,6 +5,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const rootDir = path.resolve(__dirname, '..', '..');
 
+/** Built-in fallback secret. Overridden by AUTH_SECRET in any real deployment. */
+export const DEFAULT_AUTH_SECRET = 'lovable-clone-dev-secret-change-me';
+
 export const config = {
   port: Number(process.env.PORT || 3001),
   host: process.env.HOST || '0.0.0.0',
@@ -28,7 +31,7 @@ export const config = {
 
   auth: {
     // Demo secret. Override with AUTH_SECRET in production.
-    secret: process.env.AUTH_SECRET || 'lovable-clone-dev-secret-change-me',
+    secret: process.env.AUTH_SECRET || DEFAULT_AUTH_SECRET,
     tokenTtlSeconds: Number(process.env.AUTH_TOKEN_TTL || 60 * 60 * 24 * 30),
   },
 
