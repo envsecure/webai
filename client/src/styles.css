@@ -1654,3 +1654,241 @@ svg {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ==========================================================================
+   Code editor
+   ========================================================================== */
+
+.code-editor {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg-elevated);
+}
+
+.code-editor__tree {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+
+.code-editor__tree-head {
+  flex: none;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+
+.code-editor__tree-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 6px 0;
+}
+
+.code-editor__file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--fg-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.code-editor__file:hover {
+  background: var(--muted);
+  color: var(--fg);
+}
+
+.code-editor__file--active,
+.code-editor__file--active:hover {
+  background: var(--muted);
+  color: var(--fg);
+}
+
+.code-editor__file-icon {
+  flex: none;
+  width: 14px;
+  text-align: center;
+  color: var(--fg-subtle);
+}
+
+.code-editor__file--active .code-editor__file-icon {
+  color: var(--fg);
+}
+
+.code-editor__file-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.code-editor__file-dir {
+  color: var(--fg-subtle);
+}
+
+.code-editor__file-size {
+  flex: none;
+  font-size: 10.5px;
+  color: var(--fg-subtle);
+}
+
+.code-editor__pane {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.code-editor__tabbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+
+.code-editor__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  height: 26px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--muted);
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.code-editor__tab-icon {
+  flex: none;
+  color: var(--fg-subtle);
+}
+
+.code-editor__editor {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.code-editor__editor .cm-editor {
+  height: 100%;
+}
+
+.code-editor__editor .cm-scroller {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.code-editor__editor .cm-gutters {
+  background: var(--bg-elevated);
+  border-right: 1px solid var(--border);
+  color: var(--fg-subtle);
+}
+
+.code-editor__empty {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  color: var(--fg-muted);
+  font-size: 14px;
+}
+
+/* ==========================================================================
+   Preview (live sandbox)
+   ========================================================================== */
+
+.preview {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--bg-elevated);
+}
+
+.preview__bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--fg-muted);
+}
+
+.preview__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--fg-subtle);
+  flex: none;
+}
+
+.preview__dot--running {
+  background: var(--success);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 22%, transparent);
+}
+
+.preview__dot--starting {
+  background: var(--accent-primary);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.preview__dot--crashed {
+  background: var(--destructive);
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.preview__stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  background: var(--muted);
+}
+
+.preview__frame {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  background: #fff;
+}
+
+/* The VS Code-style editor fills the preview pane. */
+.code-editor-host {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  background: var(--bg-elevated);
+}

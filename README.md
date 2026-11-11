@@ -14,11 +14,12 @@ you iterate with follow-up messages.
 
 | Layer    | Choice                                                        |
 | -------- | ------------------------------------------------------------- |
-| Frontend | React 18, React Router 6, Vite 6, plain CSS (design tokens)  |
+| Frontend | React 18, React Router 6, Vite 6, CodeMirror 6 editor, plain CSS |
 | Backend  | Node.js, Express 4, CORS, ESM modules                         |
 | Database | SQLite via `better-sqlite3` (falls back to `node:sqlite`)    |
 | Auth     | scrypt password hashing + opaque session tokens in the DB     |
 | Agent    | Tool-use loop with context compaction and subagents           |
+| Preview  | Each project runs in its own sandbox (Vite + Express + SQLite) |
 
 ---
 
@@ -67,6 +68,31 @@ Per-user keys are encrypted with AES-256-GCM before they are stored. With no
 provider configured there is **no model**, and the app says so instead of
 building something fake.
 
+### The preview sandbox
+
+Every project runs its own sandbox, so the generated app is really running:
+
+- the generated Express routers are mounted at `/api/<entity>` with a
+  per-project SQLite file,
+- the generated React app is served by Vite with the automatic JSX runtime,
+  so the preview is the app itself, not a mock-up.
+
+The sandbox is reachable at `/api/sandbox/<projectId>/` and the app proxies to
+it, so the preview runs on the same origin as the builder (no CORS, relative
+API calls just work). Hot reload works too: the websocket upgrade is proxied
+to the sandbox.
+
+Docker is used when a daemon is reachable (`deploy/sandbox.Dockerfile`,
+one container per project); otherwise the same runtime runs as a local child
+process. The preview URL is identical either way.
+
+### The code editor
+
+The Code tab is a VS Code-style viewer: a file explorer with icons and file
+sizes, a tab strip, line numbers, bracket matching, a fold gutter and syntax
+highlighting for JavaScript, JSX, JSON, CSS, HTML, Markdown and SQL. It is
+loaded on demand, so the main bundle stays small.
+
 ### Streaming
 
 `POST /api/projects/:id/chat/stream` returns newline-delimited JSON as the
@@ -81,6 +107,7 @@ npm run test:agent                     # loop, subagents, review, compaction, st
 npm run fake:llm &                     # a local OpenAI-compatible server
 npm run test:provider                  # the real HTTP provider path
 npm run test:setup                     # no model -> clear error -> detect -> connect -> build
+npm run test:sandbox                   # the preview sandbox boots and serves the app
 ```
 
 ---

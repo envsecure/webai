@@ -20,6 +20,7 @@ import {
 } from '../repositories/projects.js';
 import { getUserSettings } from '../repositories/settings.js';
 import { buildProject, NoModelConfiguredError } from '../services/build.js';
+import { startSandboxFromProject } from '../services/sandbox.js';
 import { id, nowIso, titleFromPrompt } from '../lib/util.js';
 
 const router = Router();
@@ -199,6 +200,9 @@ router.post('/:projectId/chat', async (req, res, next) => {
       status: 'ready',
     });
 
+    // Bring the preview sandbox up with the new files.
+    startSandboxFromProject(project.id).catch((err) => console.warn('[sandbox]', err.message));
+
     const messages = await listMessages(req.user.id, chat.id);
     res.status(201).json({
       chat,
@@ -316,6 +320,8 @@ router.post('/:projectId/chat/stream', async (req, res) => {
       status: 'ready',
     });
 
+    startSandboxFromProject(project.id).catch((err) => console.warn('[sandbox]', err.message));
+
     send({
       type: 'result',
       chatId: chat.id,
@@ -413,6 +419,7 @@ router.post('/quick-build', async (req, res, next) => {
       },
     });
     await createVersion(project.id, 'v1', result.summary, result.files);
+    startSandboxFromProject(project.id).catch((err) => console.warn('[sandbox]', err.message));
     await updateProject(req.user.id, project.id, {
       description: result.summary,
       status: 'ready',

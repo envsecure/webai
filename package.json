@@ -2,7 +2,7 @@
   "name": "webai",
   "version": "1.0.0",
   "private": true,
-  "description": "webai — a Lovable-style AI app builder: React + Express + SQLite",
+  "description": "webai \u2014 a Lovable-style AI app builder: React + Express + SQLite",
   "workspaces": [
     "server",
     "client"
@@ -18,7 +18,8 @@
     "verify": "node scripts/verify-install.mjs",
     "test:agent": "node scripts/test-agent.mjs",
     "test:provider": "node scripts/test-provider.mjs",
-    "fake:llm": "node scripts/fake-openai.mjs"
+    "fake:llm": "node scripts/fake-openai.mjs",
+    "test:sandbox": "node scripts/test-sandbox.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

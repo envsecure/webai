@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import config from './config.js';
 import { initDatabase } from './db/index.js';
 import { createApp } from './app.js';
+import { handleSandboxUpgrade } from './routes/sandbox-ws.js';
 
 async function main() {
   // The data directory holds the database: create it with tight permissions.
@@ -18,6 +19,9 @@ async function main() {
   const server = app.listen(config.port, config.host, () => {
     console.log(`[server] listening on http://${config.host}:${config.port} (${config.nodeEnv})`);
   });
+
+  // The preview sandbox uses a websocket for hot reloading.
+  server.on('upgrade', handleSandboxUpgrade);
 
   const shutdown = (signal) => {
     console.log(`[server] ${signal} received, closing`);

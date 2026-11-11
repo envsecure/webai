@@ -344,7 +344,42 @@ run it before restarting.
 
 ---
 
-## 8. Backups
+## 8. The preview sandbox
+
+Each project runs in its own sandbox so the generated app can be previewed and
+used for real:
+
+| Part      | What it is                                                     |
+| --------- | -------------------------------------------------------------- |
+| Runtime   | `server/src/sandbox/runtime.js` - Express + the generated routes |
+| Frontend  | Vite in middleware mode, serving the generated React app         |
+| Database  | One SQLite file per project under `data/sandboxes/<id>/`        |
+| Docker    | `deploy/sandbox.Dockerfile`, one container per project          |
+
+Docker is used automatically when a daemon is reachable; otherwise the same
+runtime runs as a local child process. Either way the preview is served at
+`/api/sandbox/<projectId>/` through the app.
+
+```bash
+# check which mode is in use
+curl -s https://your-domain.com/api/projects/<id>/sandbox -H "Authorization: Bearer $TOKEN"
+
+# build the sandbox image yourself (optional)
+docker build -t webai-sandbox:latest -f deploy/sandbox.Dockerfile .
+```
+
+Sandbox state lives in `data/sandboxes/<projectId>/` and is disposable: delete
+the directory and it is rebuilt from the latest version on the next build.
+
+### Sandboxes need a writable data directory
+
+The runtime writes to `data/sandboxes/`, so that directory must be writable by
+the service user (`webai`). It is covered by `ReadWritePaths` in the systemd
+unit.
+
+---
+
+## 9. Backups
 
 The whole database is one file.
 
@@ -366,7 +401,7 @@ Nightly cron:
 
 ---
 
-## 9. Troubleshooting
+## 10. Troubleshooting
 
 | Symptom                              | Cause / fix                                                                 |
 | ------------------------------------ | --------------------------------------------------------------------------- |
@@ -390,7 +425,7 @@ curl -s http://127.0.0.1:3001/api/stats
 
 ---
 
-## 10. Security checklist
+## 11. Security checklist
 
 - [ ] Set a unique `AUTH_SECRET` (never ship the default).
 - [ ] `NODE_ENV=production`.

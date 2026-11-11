@@ -1,7 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import api from '../lib/api.js';
 import { describeEvent, streamChat } from '../lib/agent.js';
+import Preview from '../components/Preview.jsx';
+
+// CodeMirror is heavy, so the editor is loaded only when the tab is opened.
+const CodeEditor = lazy(() => import('../components/CodeEditor.jsx'));
 
 const TABS = [
   { id: 'preview', label: 'Preview' },
@@ -286,104 +290,26 @@ export default function Builder() {
               {t.label}
             </button>
           ))}
-          {tab === 'code' && fileList.length > 0 && (
-            <span className="row row--wrap" style={{ gap: 4, marginLeft: 'auto' }}>
-              {fileList.map((f) => (
-                <button
-                  key={f}
-                  className={`tab ${activeFile === f ? 'tab--active' : ''}`}
-                  onClick={() => setActiveFile(f)}
-                >
-                  {f.split('/').pop()}
-                </button>
-              ))}
-            </span>
-          )}
         </div>
 
         {tab === 'preview' && (
-          <div style={{ padding: 20, overflow: 'auto' }}>
-            {plan.length > 0 && (
-              <div className="plan" style={{ marginBottom: 18 }}>
-                <div className="eyebrow" style={{ marginBottom: 8 }}>
-                  Build plan
-                </div>
-                {plan.map((step) => (
-                  <div className="plan__row" key={step.step}>
-                    <span className="plan__step">{step.step}</span>
-                    <span className="plan__detail">{step.detail}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {fileList.length === 0 ? (
-              <div className="empty" style={{ padding: 48, textAlign: 'center' }}>
-                <p style={{ fontWeight: 600, color: 'var(--fg)' }}>Nothing generated yet</p>
-                <p style={{ marginTop: 6, fontSize: 14 }}>
-                  Send a message and the agent will plan, write and review an app.
-                </p>
-              </div>
-            ) : (
-              <div className="card">
-                <h3 className="card__title">{project.name}</h3>
-                <p className="card__body">{project.description}</p>
-                <div className="row row--wrap" style={{ marginTop: 16 }}>
-                  {fileList.map((f) => (
-                    <span className="badge mono" key={f}>
-                      {f}
-                    </span>
-                  ))}
-                </div>
-                <div className="stack" style={{ marginTop: 20 }}>
-                  {fileList.map((name) => (
-                    <details key={name}>
-                      <summary style={{ cursor: 'pointer', fontSize: 14 }}>{name}</summary>
-                      <pre
-                        className="code"
-                        style={{ marginTop: 8, borderRadius: 12, background: 'var(--muted)' }}
-                      >
-                        {files[name]}
-                      </pre>
-                    </details>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {agentInfo && (
-              <div className="agent-meta" style={{ marginTop: 18 }}>
-                <span className="agent-meta__item">
-                  provider: {agentInfo.provider || 'local'}
-                  {agentInfo.model ? ` (${agentInfo.model})` : ''}
-                </span>
-                {agentInfo.iterations ? (
-                  <span className="agent-meta__item">{agentInfo.iterations} iterations</span>
-                ) : null}
-                {agentInfo.usage?.total_tokens ? (
-                  <span className="agent-meta__item">{agentInfo.usage.total_tokens} tokens</span>
-                ) : null}
-                {agentInfo.context?.compactions ? (
-                  <span className="agent-meta__item">
-                    {agentInfo.context.compactions} context compaction(s)
-                  </span>
-                ) : null}
-                {(agentInfo.subagents || []).map((s) => (
-                  <span className="agent-meta__item" key={s.id}>
-                    ↳ {s.label}: {s.iterations} iteration(s)
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
+          <Preview projectId={projectId} files={files} refreshKey={versions.length} />
         )}
 
         {tab === 'code' && (
-          <pre className="code">
-            {fileList.length === 0
-              ? 'No code generated yet.'
-              : files[activeFile || fileList[0]] || 'Select a file above.'}
-          </pre>
+          <div className="code-editor-host">
+            <Suspense
+              fallback={
+                <div className="skeleton" style={{ flex: 1, margin: 16, minHeight: 320 }} />
+              }
+            >
+              <CodeEditor
+                files={files}
+                activePath={activeFile}
+                onSelectPath={setActiveFile}
+              />
+            </Suspense>
+          </div>
         )}
 
         {tab === 'versions' && (

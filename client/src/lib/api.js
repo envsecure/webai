@@ -100,6 +100,12 @@ export const api = {
   },
   likeProject: (id) => request(`/community/${id}/like`, { method: 'POST', auth: false }),
 
+  // sandbox / preview
+  sandboxStatus: (id) => request(`/projects/${id}/sandbox`),
+  startSandbox: (id) => request(`/projects/${id}/sandbox/start`, { method: 'POST', body: {} }),
+  restartSandbox: (id) => request(`/projects/${id}/sandbox/restart`, { method: 'POST', body: {} }),
+  stopSandbox: (id) => request(`/projects/${id}/sandbox/stop`, { method: 'POST', body: {} }),
+
   // settings
   settings: () => request('/settings'),
   saveSettings: (data) => request('/settings', { method: 'PUT', body: data }),

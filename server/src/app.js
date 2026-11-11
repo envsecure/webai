@@ -8,11 +8,17 @@ import authRoutes from './routes/auth.js';
 import projectRoutes from './routes/projects.js';
 import catalogRoutes from './routes/catalog.js';
 import settingsRoutes from './routes/settings.js';
+import sandboxProxy, { manage as sandboxManage } from './routes/sandbox.js';
 
 export function createApp() {
   const app = express();
 
   app.use(cors());
+
+  // The preview proxy forwards the raw body, so it is mounted before the
+  // JSON body parser.
+  app.use('/api/sandbox', sandboxProxy);
+
   app.use(express.json({ limit: '2mb' }));
   app.use(express.urlencoded({ extended: true }));
 
@@ -69,6 +75,7 @@ export function createApp() {
   app.use('/api/projects', projectRoutes);
   app.use('/api', catalogRoutes);
   app.use('/api', settingsRoutes);
+  app.use('/api', sandboxManage);
 
   app.use('/api', (_req, res) => {
     res.status(404).json({ error: 'not_found', message: 'Unknown API endpoint' });
